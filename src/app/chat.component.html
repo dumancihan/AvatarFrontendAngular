@@ -1,0 +1,43 @@
+<div class="chat-container p-4 bg-gray-100 h-full">
+    <!-- Nachrichtenanzeige -->
+    <div *ngFor="let message of messages$ | async" class="mb-4">
+      <div [ngClass]="{'chat chat-start': message.sender === 'User', 'chat chat-end': message.sender === 'AI'}">
+        <div class="chat-image avatar">
+          <div class="w-10 rounded-full">
+            <img alt="Avatar" src="https://img.daisyui.com/images/stock/photo-1534528741775-53994a69daeb.webp" />
+          </div>
+        </div>
+        <div class="chat-header">
+          {{ message.sender }}
+          <time class="text-xs opacity-50">{{ message.timestamp }}</time>
+        </div>
+        <div class="chat-bubble">{{ message.text }}</div>
+        <div class="chat-footer opacity-50">{{ message.sender === 'User' ? 'gesendet' : 'gesehen' }}</div>
+      </div>
+    </div>
+  
+    <!-- Eingabefeld und Senden-Button -->
+    <div class="relative flex justify-center mt-4 w-full">
+      <!-- Eingabefeld -->
+      <textarea 
+        [(ngModel)]="userInput"
+        class="w-96 h-auto resize-none overflow-hidden p-2 pr-12 bg-gray-200 focus:outline-none placeholder-white"
+        placeholder="Nachricht eingeben..."
+        rows="1">
+      </textarea>
+  
+      <!-- Senden-Button -->
+      <button 
+        (click)="sendMessage()" 
+        class="absolute right-2 bottom-2 bg-blue-500 text-white rounded-full p-2 hover:bg-blue-600 focus:outline-none" 
+        aria-label="Nachricht senden">
+        &#9658;
+      </button>
+    </div>
+  
+    <!-- Ladeanzeige während der API-Anfrage -->
+    <div *ngIf="loading$ | async" class="text-center text-gray-500 mt-4">
+      Lade...
+    </div>
+  </div>
+  

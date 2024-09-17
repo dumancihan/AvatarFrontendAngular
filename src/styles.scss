@@ -1,0 +1,75 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@keyframes move-slow {
+  0%, 100% {
+    transform: translate(0, 0);
+  }
+  25% {
+    transform: translate(20px, -30px);
+  }
+  50% {
+    transform: translate(-15px, 20px);
+  }
+  75% {
+    transform: translate(30px, 15px);
+  }
+}
+
+@keyframes move-medium {
+  0%, 100% {
+    transform: translate(0, 0);
+  }
+  25% {
+    transform: translate(-30px, 20px);
+  }
+  50% {
+    transform: translate(25px, -10px);
+  }
+  75% {
+    transform: translate(-20px, -25px);
+  }
+}
+
+@keyframes move-fast {
+  0%, 100% {
+    transform: translate(0, 0);
+  }
+  25% {
+    transform: translate(50px, -40px);
+  }
+  50% {
+    transform: translate(-35px, 30px);
+  }
+  75% {
+    transform: translate(45px, -20px);
+  }
+}
+
+@keyframes rotate {
+  0% {
+    transform: rotate(0deg) translateX(90px) rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg) translateX(120px) rotate(-360deg);
+  }
+}
+
+.animate-rotate {
+  animation: rotate 10s linear infinite;
+  transform-origin: center;
+}
+
+
+.animate-move-slow {
+  animation: move-slow 15s linear infinite;
+}
+
+.animate-move-medium {
+  animation: move-medium 10s linear infinite;
+}
+
+.animate-move-fast {
+  animation: move-fast 5s linear infinite;
+}

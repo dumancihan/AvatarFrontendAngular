@@ -1,0 +1,27 @@
+.chat-start {
+    align-self: flex-start;
+  }
+  .chat-end {
+    align-self: flex-end;
+  }
+  
+  .circle {
+    width: 3rem; /* Breite des Kreises */
+    height: 3rem; /* Höhe des Kreises */
+    background-color: #f8ec17; /* Farbe des Kreises */
+    border-radius: 50%; /* Rundung, um den Kreis zu erstellen */
+    position: absolute; /* Absolute Positionierung innerhalb des Containers */
+    transform: translate(-0%, -60%); /* Zentriert den Kreis sowohl horizontal als auch vertikal */
+    transition: transform 0.3s, background-color 0.3s;
+    display: flex; /* Flexbox für die Zentrierung des Inhalts */
+    align-items: center; /* Vertikale Zentrierung des Inhalts */
+    justify-content: center; /* Horizontale Zentrierung des Inhalts */
+    font-size: 2rem; /* Größe des Pfeils */
+    color: #016974 ;
+    cursor: pointer;   
+  }
+  
+  .circle:hover {
+    background-color: #beb61d; /* Farbe des Kreises */
+
+  }
