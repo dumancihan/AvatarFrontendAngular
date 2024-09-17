@@ -1,9 +1,403 @@
 import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
-import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import Stats from 'three/addons/libs/stats.module.js';
+import {GLTFLoader} from '../three/examples/jsm/loaders/GLTFLoader.js';
+import { OrbitControls } from '../three/examples/jsm/controls/OrbitControls.js';
+import { FBXLoader } from '../three/examples/jsm/loaders/FBXLoader.js';
+import { RoomEnvironment } from '../three/examples/jsm/environments/RoomEnvironment.js';
+import Stats from '../three/examples/jsm/libs/stats.module.js';
+
+// Lip-sync implementations for different languages
+// import { LipsyncFi } from './lipsync-fi.mjs';
+// import { LipsyncEn } from './lipsync-en.mjs';
+// import { LipsyncLt } from './lipsync-lt.mjs';
+
+
+/**
+* @class English lip-sync processor
+* @author Mika Suominen
+*/
+
+class LipsyncEn {
+
+  /**
+  * @constructor
+  */
+  constructor() {
+
+    // English words to Oculus visemes, algorithmic rules adapted from:
+    //   NRL Report 7948, "Automatic Translation of English Text to Phonetics by Means of Letter-to-Sound Rules" (1976)
+    //   by HONEY SUE EL.OVITZ, RODNEY W. JOHNSON, ASTRID McHUGH, AND JOHN E. SHORE
+    //   Available at: https://apps.dtic.mil/sti/pdfs/ADA021929.pdf
+    this.rules = {
+      'A': [
+        "[A] =aa", " [ARE] =aa RR", " [AR]O=aa RR", "[AR]#=E RR",
+        " ^[AS]#=E SS", "[A]WA=aa", "[AW]=aa", " :[ANY]=E nn I",
+        "[A]^+#=E", "#:[ALLY]=aa nn I", " [AL]#=aa nn", "[AGAIN]=aa kk E nn",
+        "#:[AG]E=I kk", "[A]^+:#=aa", ":[A]^+ =E", "[A]^%=E",
+        " [ARR]=aa RR", "[ARR]=aa RR", " :[AR] =aa RR", "[AR] =E",
+        "[AR]=aa RR", "[AIR]=E RR", "[AI]=E", "[AY]=E", "[AU]=aa",
+        "#:[AL] =aa nn", "#:[ALS] =aa nn SS", "[ALK]=aa kk", "[AL]^=aa nn",
+        " :[ABLE]=E PP aa nn", "[ABLE]=aa PP aa nn", "[ANG]+=E nn kk", "[A]=aa"
+      ],
+
+      'B': [
+        " [BE]^#=PP I", "[BEING]=PP I I nn", " [BOTH] =PP O TH",
+        " [BUS]#=PP I SS", "[BUIL]=PP I nn", "[B]=PP"
+      ],
+
+      'C': [
+        " [CH]^=kk", "^E[CH]=kk", "[CH]=CH", " S[CI]#=SS aa",
+        "[CI]A=SS", "[CI]O=SS", "[CI]EN=SS", "[C]+=SS",
+        "[CK]=kk", "[COM]%=kk aa PP", "[C]=kk"
+      ],
+
+      'D': [
+        "#:[DED] =DD I DD", ".E[D] =DD", "#^:E[D] =DD", " [DE]^#=DD I",
+        " [DO] =DD U", " [DOES]=DD aa SS", " [DOING]=DD U I nn",
+        " [DOW]=DD aa", "[DU]A=kk U", "[D]=DD"
+      ],
+
+      'E': [
+        "#:[E] =", "'^:[E] =", " :[E] =I", "#[ED] =DD", "#:[E]D =",
+        "[EV]ER=E FF", "[E]^%=I", "[ERI]#=I RR I", "[ERI]=E RR I",
+        "#:[ER]#=E", "[ER]#=E RR", "[ER]=E", " [EVEN]=I FF E nn",
+        "#:[E]W=", "@[EW]=U", "[EW]=I U", "[E]O=I", "#:&[ES] =I SS",
+        "#:[E]S =", "#:[ELY] =nn I", "#:[EMENT]=PP E nn DD", "[EFUL]=FF U nn",
+        "[EE]=I", "[EARN]=E nn", " [EAR]^=E", "[EAD]=E DD", "#:[EA] =I aa",
+        "[EA]SU=E", "[EA]=I", "[EIGH]=E", "[EI]=I", " [EYE]=aa", "[EY]=I",
+        "[EU]=I U", "[E]=E"
+      ],
+
+      'F': [
+        "[FUL]=FF U nn", "[F]=FF"
+      ],
+
+      'G': [
+        "[GIV]=kk I FF", " [G]I^=kk", "[GE]T=kk E", "SU[GGES]=kk kk E SS",
+        "[GG]=kk", " B#[G]=kk", "[G]+=kk", "[GREAT]=kk RR E DD",
+        "#[GH]=", "[G]=kk"
+      ],
+
+      'H': [
+        " [HAV]=I aa FF", " [HERE]=I I RR", " [HOUR]=aa EE", "[HOW]=I aa",
+        "[H]#=I", "[H]="
+      ],
+
+      'I': [
+        " [IN]=I nn", " [I] =aa", "[IN]D=aa nn", "[IER]=I E",
+        "#:R[IED] =I DD", "[IED] =aa DD", "[IEN]=I E nn", "[IE]T=aa E",
+        " :[I]%=aa", "[I]%=I", "[IE]=I", "[I]^+:#=I", "[IR]#=aa RR",
+        "[IZ]%=aa SS", "[IS]%=aa SS", "[I]D%=aa", "+^[I]^+=I",
+        "[I]T%=aa", "#^:[I]^+=I", "[I]^+=aa", "[IR]=E", "[IGH]=aa",
+        "[ILD]=aa nn DD", "[IGN] =aa nn", "[IGN]^=aa nn", "[IGN]%=aa nn",
+        "[IQUE]=I kk", "[I]=I"
+      ],
+
+      'J': [
+        "[J]=kk"
+      ],
+
+      'K': [
+        " [K]N=", "[K]=kk"
+      ],
+
+      'L': [
+        "[LO]C#=nn O", "L[L]=", "#^:[L]%=aa nn", "[LEAD]=nn I DD", "[L]=nn"
+      ],
+
+      'M': [
+        "[MOV]=PP U FF", "[M]=PP"
+      ],
+
+      'N': [
+        "E[NG]+=nn kk", "[NG]R=nn kk", "[NG]#=nn kk", "[NGL]%=nn kk aa nn",
+        "[NG]=nn", "[NK]=nn kk", " [NOW] =nn aa", "[N]=nn"
+      ],
+
+      'O': [
+        "[OF] =aa FF", "[OROUGH]=E O", "#:[OR] =E", "#:[ORS] =E SS",
+        "[OR]=aa RR", " [ONE]=FF aa nn", "[OW]=O", " [OVER]=O FF E",
+        "[OV]=aa FF", "[O]^%=O", "[O]^EN=O", "[O]^I#=O", "[OL]D=O nn",
+        "[OUGHT]=aa DD", "[OUGH]=aa FF", " [OU]=aa", "H[OU]S#=aa",
+        "[OUS]=aa SS", "[OUR]=aa RR", "[OULD]=U DD", "^[OU]^L=aa",
+        "[OUP]=U OO", "[OU]=aa", "[OY]=O", "[OING]=O I nn", "[OI]=O",
+        "[OOR]=aa RR", "[OOK]=U kk", "[OOD]=U DD", "[OO]=U", "[O]E=O",
+        "[O] =O", "[OA]=O", " [ONLY]=O nn nn I", " [ONCE]=FF aa nn SS",
+        "[ON'T]=O nn DD", "C[O]N=aa", "[O]NG=aa", " ^:[O]N=aa",
+        "I[ON]=aa nn", "#:[ON] =aa nn", "#^[ON]=aa nn", "[O]ST =O",
+        "[OF]^=aa FF", "[OTHER]=aa TH E", "[OSS] =aa SS", "#^:[OM]=aa PP",
+        "[O]=aa"
+      ],
+
+      'P': [
+        "[PH]=FF", "[PEOP]=PP I PP", "[POW]=PP aa", "[PUT] =PP U DD",
+        "[P]=PP"
+      ],
+
+      'Q': [
+        "[QUAR]=kk FF aa RR", "[QU]=kk FF", "[Q]=kk"
+      ],
+
+      'R': [
+        " [RE]^#=RR I", "[R]=RR"
+      ],
+
+      'S': [
+        "[SH]=SS", "#[SION]=SS aa nn", "[SOME]=SS aa PP", "#[SUR]#=SS E",
+        "[SUR]#=SS E", "#[SU]#=SS U", "#[SSU]#=SS U", "#[SED] =SS DD",
+        "#[S]#=SS", "[SAID]=SS E DD", "^[SION]=SS aa nn", "[S]S=",
+        ".[S] =SS", "#:.E[S] =SS", "#^:##[S] =SS", "#^:#[S] =SS",
+        "U[S] =SS", " :#[S] =SS", " [SCH]=SS kk", "[S]C+=",
+        "#[SM]=SS PP", "#[SN]'=SS aa nn", "[S]=SS"
+      ],
+
+      'T': [
+        " [THE] =TH aa", "[TO] =DD U", "[THAT] =TH aa DD", " [THIS] =TH I SS",
+        " [THEY]=TH E", " [THERE]=TH E RR", "[THER]=TH E", "[THEIR]=TH E RR",
+        " [THAN] =TH aa nn", " [THEM] =TH E PP", "[THESE] =TH I SS",
+        " [THEN]=TH E nn", "[THROUGH]=TH RR U", "[THOSE]=TH O SS",
+        "[THOUGH] =TH O", " [THUS]=TH aa SS", "[TH]=TH", "#:[TED] =DD I DD",
+        "S[TI]#N=CH", "[TI]O=SS", "[TI]A=SS", "[TIEN]=SS aa nn",
+        "[TUR]#=CH E", "[TU]A=CH U", " [TWO]=DD U", "[T]=DD"
+      ],
+
+      'U': [
+        " [UN]I=I U nn", " [UN]=aa nn", " [UPON]=aa PP aa nn",
+        "@[UR]#=U RR", "[UR]#=I U RR", "[UR]=E", "[U]^ =aa",
+        "[U]^^=aa", "[UY]=aa", " G[U]#=", "G[U]%=", "G[U]#=FF",
+        "#N[U]=I U", "@[U]=I", "[U]=I U"
+      ],
+
+      'V': [
+        "[VIEW]=FF I U", "[V]=FF"
+      ],
+
+      'W': [
+        " [WERE]=FF E", "[WA]S=FF aa", "[WA]T=FF aa", "[WHERE]=FF E RR",
+        "[WHAT]=FF aa DD", "[WHOL]=I O nn", "[WHO]=I U", "[WH]=FF",
+        "[WAR]=FF aa RR", "[WOR]^=FF E", "[WR]=RR", "[W]=FF"
+      ],
+
+      'X': [
+        " [X]=SS", "[X]=kk SS"
+      ],
+
+      'Y': [
+        "[YOUNG]=I aa nn", " [YOU]=I U", " [YES]=I E SS", " [Y]=I",
+        "#^:[Y] =I", "#^:[Y]I=I", " :[Y] =aa", " :[Y]#=aa",
+        " :[Y]^+:#=I", " :[Y]^#=I", "[Y]=I"
+      ],
+
+      'Z': [
+        "[Z]=SS"
+      ]
+    };
+
+    const ops = {
+      '#': '[AEIOUY]+', // One or more vowels AEIOUY
+      // This one is not used: "'": '[BCDFGHJKLMNPQRSTVWXZ]+', // One or more consonants BCDFGHJKLMNPQRSTVWXZ
+      '.': '[BDVGJLMNRWZ]', // One voiced consonant BDVGJLMNRWZ
+      // This one is not used: '$': '[BDVGJLMNRWZ][EI]', // One consonant followed by E or I
+      '%': '(?:ER|E|ES|ED|ING|ELY)', // One of ER, E, ES, ED, ING, ELY
+      '&': '(?:[SCGZXJ]|CH|SH)', // One of S, C, G, Z, X, J, CH, SH
+      '@': '(?:[TSRDLZNJ]|TH|CH|SH)', // One of T, S, R, D, L, Z, N, J, TH, CH, SH
+      '^': '[BCDFGHJKLMNPQRSTVWXZ]', // One consonant BCDFGHJKLMNPQRSTVWXZ
+      '+': '[EIY]', // One of E, I, Y
+      ':': '[BCDFGHJKLMNPQRSTVWXZ]*', // Zero or more consonants BCDFGHJKLMNPQRSTVWXZ
+      ' ': '\\b' // Start/end of the word
+    };
+
+    // Convert rules to regex
+    Object.keys(this.rules).forEach( key => {
+      this.rules[key] = this.rules[key].map( rule => {
+        const posL = rule.indexOf('[');
+        const posR = rule.indexOf(']');
+        const posE = rule.indexOf('=');
+        const strLeft = rule.substring(0,posL);
+        const strLetters = rule.substring(posL+1,posR);
+        const strRight = rule.substring(posR+1,posE);
+        const strVisemes = rule.substring(posE+1);
+
+        const o = { regex: '', move: 0, visemes: [] };
+
+        let exp = '';
+        exp += [...strLeft].map( x => ops[x] || x ).join('');
+        const ctxLetters = [...strLetters];
+        ctxLetters[0] = ctxLetters[0].toLowerCase();
+        exp += ctxLetters.join('');
+        o.move = ctxLetters.length;
+        exp += [...strRight].map( x => ops[x] || x ).join('');
+        o.regex = new RegExp(exp);
+
+        if ( strVisemes.length ) {
+          strVisemes.split(' ').forEach( viseme => {
+            o.visemes.push(viseme);
+          });
+        }
+
+        return o;
+      });
+    });
+
+    // Viseme durations in relative unit (1=average)
+    // TODO: Check for statistics for English
+    this.visemeDurations = {
+      'aa': 0.95, 'E': 0.90, 'I': 0.92, 'O': 0.96, 'U': 0.95, 'PP': 1.08,
+      'SS': 1.23, 'TH': 1, 'FF': 1.00, 'kk': 1.21, 'nn': 0.88,
+      'RR': 0.88, 'DD': 1.05, 'sil': 1
+    };
+
+    // Pauses in relative units (1=average)
+    this.specialDurations = { ' ': 1, ',': 3, '-':0.5 };
+
+    // English number words
+    this.digits = ['oh', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
+    this.ones = ['','one','two','three','four','five','six','seven','eight','nine'];
+    this.tens = ['','','twenty','thirty','forty','fifty','sixty','seventy','eighty','ninety'];
+    this.teens = ['ten','eleven','twelve','thirteen','fourteen','fifteen','sixteen','seventeen','eighteen','nineteen'];
+
+    // Symbols to English
+    this.symbols = {
+      '%': 'percentage', '€': 'euros', '&': 'and', '+': 'plus',
+      '$': 'dollars'
+    };
+    this.symbolsReg = /[%€&\+\$]/g;
+  }
+
+  convert_digit_by_digit(num) {
+    num = String(num).split("");
+    let numWords = "";
+    for(let m=0; m<num.length; m++) {
+      numWords += this.digits[num[m]] + " ";
+    }
+    numWords = numWords.substring(0, numWords.length - 1); //kill final space
+    return numWords;
+  }
+
+  convert_sets_of_two(num) {
+    let firstNumHalf = String(num).substring(0, 2);
+    let secondNumHalf = String(num).substring(2, 4);
+    let numWords = this.convert_tens(firstNumHalf);
+    numWords += " " + this.convert_tens(secondNumHalf);
+    return numWords;
+  }
+
+  convert_millions(num){
+    if (num>=1000000){
+      return this.convert_millions(Math.floor(num/1000000))+" million "+this.convert_thousands(num%1000000);
+    } else {
+      return this.convert_thousands(num);
+    }
+  }
+
+  convert_thousands(num){
+    if (num>=1000){
+      return this.convert_hundreds(Math.floor(num/1000))+" thousand "+this.convert_hundreds(num%1000);
+    } else {
+      return this.convert_hundreds(num);
+    }
+  }
+
+  convert_hundreds(num){
+    if (num>99){
+      return this.ones[Math.floor(num/100)]+" hundred "+this.convert_tens(num%100);
+    } else {
+      return this.convert_tens(num);
+    }
+  }
+
+  convert_tens(num){
+    if (num<10) return this.ones[num];
+    else if (num>=10 && num<20) {
+      return this.teens[num-10];
+    } else {
+      return this.tens[Math.floor(num/10)]+" "+this.ones[num%10];
+    }
+  }
+
+  convertNumberToWords(num){
+    if (num==0) {
+      return "zero";
+    } else if ((num<1000&&num>99)||(num>10000&&num<1000000)) { //read area and zip codes digit by digit
+      return this.convert_digit_by_digit(num);
+    } else if ((num > 1000 && num < 2000)||(num>2009&&num<3000)) { //read years as two sets of two digits
+      return this.convert_sets_of_two(num);
+    } else {
+      return this.convert_millions(num);
+    }
+  }
+
+
+  /**
+  * Preprocess text:
+  * - convert symbols to words
+  * - convert numbers to words
+  * - filter out characters that should be left unspoken
+  * @param {string} s Text
+  * @return {string} Pre-processsed text.
+  */
+  preProcessText(s) {
+    return s.replace('/[#_*\'\":;]/g','')
+      .replace( this.symbolsReg, (symbol) => {
+        return ' ' + this.symbols[symbol] + ' ';
+      })
+      .replace(/(\d)\,(\d)/g, '$1 point $2') // Number separator
+      .replace(/\d+/g, this.convertNumberToWords.bind(this)) // Numbers to words
+      .replace(/(\D)\1\1+/g, "$1$1") // max 2 repeating chars
+      .replaceAll('  ',' ') // Only one repeating space
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '').normalize('NFC') // Remove non-English diacritics
+      .trim();
+  }
+
+
+  /**
+  * Convert word to Oculus LipSync Visemes and durations
+  * @param {string} w Text
+  * @return {Object} Oculus LipSync Visemes and durations.
+  */
+  wordsToVisemes(w) {
+    let o = { words: w.toUpperCase(), visemes: [], times: [], durations: [], i:0 };
+    let t = 0;
+
+    const chars = [...o.words];
+    while( o.i < chars.length ) {
+      const c = chars[o.i];
+      const ruleset = this.rules[c];
+      if ( ruleset ) {
+        for(let i=0; i<ruleset.length; i++) {
+          const rule = ruleset[i];
+          const test = o.words.substring(0, o.i) + c.toLowerCase() + o.words.substring(o.i+1);
+          let matches = test.match(rule.regex);
+          if ( matches ) {
+            rule.visemes.forEach( viseme => {
+              if ( o.visemes.length && o.visemes[ o.visemes.length - 1 ] === viseme ) {
+                const d = 0.7 * (this.visemeDurations[viseme] || 1);
+                o.durations[ o.durations.length - 1 ] += d;
+                t += d;
+              } else {
+                const d = this.visemeDurations[viseme] || 1;
+                o.visemes.push( viseme );
+                o.times.push(t);
+                o.durations.push( d );
+                t += d;
+              }
+            })
+            o.i += rule.move;
+            break;
+          }
+        }
+      } else {
+        o.i++;
+        t += this.specialDurations[c] || 0;
+      }
+    }
+
+    return o;
+  }
+
+}
+
+export { LipsyncEn };
+
 
 /**
 * @class Talking Head
@@ -88,12 +482,10 @@ class TalkingHead {
       ttsPitch: 0,
       ttsVolume: 0,
       lipsyncLang: 'fi',
-      lipsyncModules: ['fi','en','lt'],
       pcmSampleRate: 22050,
       modelRoot: "Armature",
       modelPixelRatio: 1,
       modelFPS: 30,
-      modelMovementFactor: 1,
       cameraView: 'full',
       cameraDistance: 0,
       cameraX: 0,
@@ -206,35 +598,10 @@ class TalkingHead {
       }
     };
 
-    // Gestures
-    // NOTE: For one hand gestures, use left left
-    this.gestureTemplates = {
-      'handup': {
-        'LeftShoulder.rotation':{x:[1.5,2,1,2], y:[0.2,0.4,1,2], z:[-1.5,-1.3,1,2]}, 'LeftArm.rotation':{x:[1.5,1.7,1,2], y:[-0.6,-0.4,1,2], z:[1,1.2,1,2]}, 'LeftForeArm.rotation':{x:-0.815, y:[-0.4,0,1,2], z:1.575}, 'LeftHand.rotation':{x:-0.529, y:-0.2, z:0.022}, 'LeftHandThumb1.rotation':{x:0.745, y:-0.526, z:0.604}, 'LeftHandThumb2.rotation':{x:-0.107, y:-0.01, z:-0.142}, 'LeftHandThumb3.rotation':{x:0, y:0.001, z:0}, 'LeftHandIndex1.rotation':{x:-0.126, y:-0.035, z:-0.087}, 'LeftHandIndex2.rotation':{x:0.255, y:0.007, z:-0.085}, 'LeftHandIndex3.rotation':{x:0, y:0, z:0}, 'LeftHandMiddle1.rotation':{x:-0.019, y:-0.128, z:-0.082}, 'LeftHandMiddle2.rotation':{x:0.233, y:0.019, z:-0.074}, 'LeftHandMiddle3.rotation':{x:0, y:0, z:0}, 'LeftHandRing1.rotation':{x:0.005, y:-0.241, z:-0.122}, 'LeftHandRing2.rotation':{x:0.261, y:0.021, z:-0.076}, 'LeftHandRing3.rotation':{x:0, y:0, z:0}, 'LeftHandPinky1.rotation':{x:0.059, y:-0.336, z:-0.2}, 'LeftHandPinky2.rotation':{x:0.153, y:0.019, z:0.001}, 'LeftHandPinky3.rotation':{x:0, y:0, z:0}
-      },
-      'index': {
-        'LeftShoulder.rotation':{x:[1.5,2,1,2], y:[0.2,0.4,1,2], z:[-1.5,-1.3,1,2]}, 'LeftArm.rotation':{x:[1.5,1.7,1,2], y:[-0.6,-0.4,1,2], z:[1,1.2,1,2]}, 'LeftForeArm.rotation':{x:-0.815, y:[-0.4,0,1,2], z:1.575}, 'LeftHand.rotation':{x:-0.276, y:-0.506, z:-0.208}, 'LeftHandThumb1.rotation':{x:0.579, y:0.228, z:0.363}, 'LeftHandThumb2.rotation':{x:-0.027, y:-0.04, z:-0.662}, 'LeftHandThumb3.rotation':{x:0, y:0.001, z:0}, 'LeftHandIndex1.rotation':{x:0, y:-0.105, z:0.225}, 'LeftHandIndex2.rotation':{x:0.256, y:-0.103, z:-0.213}, 'LeftHandIndex3.rotation':{x:0, y:0, z:0}, 'LeftHandMiddle1.rotation':{x:1.453, y:0.07, z:0.021}, 'LeftHandMiddle2.rotation':{x:1.599, y:0.062, z:0.07}, 'LeftHandMiddle3.rotation':{x:0, y:0, z:0}, 'LeftHandRing1.rotation':{x:1.528, y:-0.073, z:0.052}, 'LeftHandRing2.rotation':{x:1.386, y:0.044, z:0.053}, 'LeftHandRing3.rotation':{x:0, y:0, z:0}, 'LeftHandPinky1.rotation':{x:1.65, y:-0.204, z:0.031}, 'LeftHandPinky2.rotation':{x:1.302, y:0.071, z:0.085}, 'LeftHandPinky3.rotation':{x:0, y:0, z:0}
-      },
-      'ok': {
-        'LeftShoulder.rotation':{x:[1.5,2,1,2], y:[0.2,0.4,1,2], z:[-1.5,-1.3,1,2]}, 'LeftArm.rotation':{x:[1.5,1.7,1,1], y:[-0.6,-0.4,1,2], z:[1,1.2,1,2]}, 'LeftForeArm.rotation':{x:-0.415, y:[-0.4,0,1,2], z:1.575}, 'LeftHand.rotation':{x:-0.476, y:-0.506, z:-0.208}, 'LeftHandThumb1.rotation':{x:0.703, y:0.445, z:0.899}, 'LeftHandThumb2.rotation':{x:-0.312, y:-0.04, z:-0.938}, 'LeftHandThumb3.rotation':{x:-0.37, y:0.024, z:-0.393}, 'LeftHandIndex1.rotation':{x:0.8, y:-0.086, z:-0.091}, 'LeftHandIndex2.rotation':{x:1.123, y:-0.046, z:-0.074}, 'LeftHandIndex3.rotation':{x:0.562, y:-0.013, z:-0.043}, 'LeftHandMiddle1.rotation':{x:-0.019, y:-0.128, z:-0.082}, 'LeftHandMiddle2.rotation':{x:0.233, y:0.019, z:-0.074}, 'LeftHandMiddle3.rotation':{x:0, y:0, z:0}, 'LeftHandRing1.rotation':{x:0.005, y:-0.241, z:-0.122}, 'LeftHandRing2.rotation':{x:0.261, y:0.021, z:-0.076}, 'LeftHandRing3.rotation':{x:0, y:0, z:0}, 'LeftHandPinky1.rotation':{x:0.059, y:-0.336, z:-0.2}, 'LeftHandPinky2.rotation':{x:0.153, y:0.019, z:0.001}, 'LeftHandPinky3.rotation':{x:0, y:0, z:0}
-      },
-      'thumbup': {
-        'LeftShoulder.rotation':{x:[1.5,2,1,2], y:[0.2,0.4,1,2], z:[-1.5,-1.3,1,2]}, 'LeftArm.rotation':{x:[1.5,1.7,1,2], y:[-0.6,-0.4,1,2], z:[1,1.2,1,2]}, 'LeftForeArm.rotation':{x:-0.415, y:0.206, z:1.575}, 'LeftHand.rotation':{x:-0.276, y:-0.506, z:-0.208}, 'LeftHandThumb1.rotation':{x:0.208, y:-0.189, z:0.685}, 'LeftHandThumb2.rotation':{x:0.129, y:-0.285, z:-0.163}, 'LeftHandThumb3.rotation':{x:-0.047, y:0.068, z:0.401}, 'LeftHandIndex1.rotation':{x:1.412, y:-0.102, z:-0.152}, 'LeftHandIndex2.rotation':{x:1.903, y:-0.16, z:-0.114}, 'LeftHandIndex3.rotation':{x:0.535, y:-0.017, z:-0.062}, 'LeftHandMiddle1.rotation':{x:1.424, y:-0.103, z:-0.12}, 'LeftHandMiddle2.rotation':{x:1.919, y:-0.162, z:-0.114}, 'LeftHandMiddle3.rotation':{x:0.44, y:-0.012, z:-0.051}, 'LeftHandRing1.rotation':{x:1.619, y:-0.127, z:-0.053}, 'LeftHandRing2.rotation':{x:1.898, y:-0.16, z:-0.115}, 'LeftHandRing3.rotation':{x:0.262, y:-0.004, z:-0.031}, 'LeftHandPinky1.rotation':{x:1.661, y:-0.131, z:-0.016}, 'LeftHandPinky2.rotation':{x:1.715, y:-0.067, z:-0.13}, 'LeftHandPinky3.rotation':{x:0.627, y:-0.023, z:-0.071}
-      },
-      'thumbdown': {
-        'LeftShoulder.rotation':{x:[1.5,2,1,2], y:[0.2,0.4,1,2], z:[-1.5,-1.3,1,2]}, 'LeftArm.rotation':{x:[1.5,1.7,1,2], y:[-0.6,-0.4,1,2], z:[1,1.2,1,2]}, 'LeftForeArm.rotation':{x:-2.015, y:0.406, z:1.575}, 'LeftHand.rotation':{x:-0.176, y:-0.206, z:-0.208}, 'LeftHandThumb1.rotation':{x:0.208, y:-0.189, z:0.685}, 'LeftHandThumb2.rotation':{x:0.129, y:-0.285, z:-0.163}, 'LeftHandThumb3.rotation':{x:-0.047, y:0.068, z:0.401}, 'LeftHandIndex1.rotation':{x:1.412, y:-0.102, z:-0.152}, 'LeftHandIndex2.rotation':{x:1.903, y:-0.16, z:-0.114}, 'LeftHandIndex3.rotation':{x:0.535, y:-0.017, z:-0.062}, 'LeftHandMiddle1.rotation':{x:1.424, y:-0.103, z:-0.12}, 'LeftHandMiddle2.rotation':{x:1.919, y:-0.162, z:-0.114}, 'LeftHandMiddle3.rotation':{x:0.44, y:-0.012, z:-0.051}, 'LeftHandRing1.rotation':{x:1.619, y:-0.127, z:-0.053}, 'LeftHandRing2.rotation':{x:1.898, y:-0.16, z:-0.115}, 'LeftHandRing3.rotation':{x:0.262, y:-0.004, z:-0.031}, 'LeftHandPinky1.rotation':{x:1.661, y:-0.131, z:-0.016}, 'LeftHandPinky2.rotation':{x:1.715, y:-0.067, z:-0.13}, 'LeftHandPinky3.rotation':{x:0.627, y:-0.023, z:-0.071}
-      },
-      'side': {
-        'LeftShoulder.rotation':{x:1.755, y:-0.035, z:-1.63}, 'LeftArm.rotation':{x:1.263, y:-0.955, z:1.024}, 'LeftForeArm.rotation':{x:0, y:0, z:0.8}, 'LeftHand.rotation':{x:-0.36, y:-1.353, z:-0.184}, 'LeftHandThumb1.rotation':{x:0.137, y:-0.049, z:0.863}, 'LeftHandThumb2.rotation':{x:-0.293, y:0.153, z:-0.193}, 'LeftHandThumb3.rotation':{x:-0.271, y:-0.17, z:0.18}, 'LeftHandIndex1.rotation':{x:-0.018, y:0.007, z:0.28}, 'LeftHandIndex2.rotation':{x:0.247, y:-0.003, z:-0.025}, 'LeftHandIndex3.rotation':{x:0.13, y:-0.001, z:-0.013}, 'LeftHandMiddle1.rotation':{x:0.333, y:-0.015, z:0.182}, 'LeftHandMiddle2.rotation':{x:0.313, y:-0.005, z:-0.032}, 'LeftHandMiddle3.rotation':{x:0.294, y:-0.004, z:-0.03}, 'LeftHandRing1.rotation':{x:0.456, y:-0.028, z:-0.092}, 'LeftHandRing2.rotation':{x:0.53, y:-0.014, z:-0.052}, 'LeftHandRing3.rotation':{x:0.478, y:-0.012, z:-0.047}, 'LeftHandPinky1.rotation':{x:0.647, y:-0.049, z:-0.184}, 'LeftHandPinky2.rotation':{x:0.29, y:-0.004, z:-0.029}, 'LeftHandPinky3.rotation':{x:0.501, y:-0.013, z:-0.049}
-      },
-      'shrug': {
-        'Neck.rotation':{x:[-0.3,0.3,1,2], y:[-0.3,0.3,1,2], z:[-0.1,0.1]}, 'Head.rotation':{x:[-0.3,0.3], y:[-0.3,0.3], z:[-0.1,0.1]}, 'RightShoulder.rotation':{x:1.732, y:-0.058, z:1.407}, 'RightArm.rotation':{x:1.305, y:0.46, z:0.118}, 'RightForeArm.rotation':{x:[0,2.0], y:[-1,0.2], z:-1.637}, 'RightHand.rotation':{x:-0.048, y:0.165, z:-0.39}, 'RightHandThumb1.rotation':{x:1.467, y:0.599, z:-1.315}, 'RightHandThumb2.rotation':{x:-0.255, y:-0.123, z:0.119}, 'RightHandThumb3.rotation':{x:0, y:-0.002, z:0}, 'RightHandIndex1.rotation':{x:-0.293, y:-0.066, z:-0.112}, 'RightHandIndex2.rotation':{x:0.181, y:0.007, z:0.069}, 'RightHandIndex3.rotation':{x:0, y:0, z:0}, 'RightHandMiddle1.rotation':{x:-0.063, y:-0.041, z:0.032}, 'RightHandMiddle2.rotation':{x:0.149, y:0.005, z:0.05}, 'RightHandMiddle3.rotation':{x:0, y:0, z:0}, 'RightHandRing1.rotation':{x:0.152, y:-0.03, z:0.132}, 'RightHandRing2.rotation':{x:0.194, y:0.007, z:0.058}, 'RightHandRing3.rotation':{x:0, y:0, z:0}, 'RightHandPinky1.rotation':{x:0.306, y:-0.015, z:0.257}, 'RightHandPinky2.rotation':{x:0.15, y:-0.003, z:-0.003}, 'RightHandPinky3.rotation':{x:0, y:0, z:0}, 'LeftShoulder.rotation':{x:1.713, y:0.141, z:-1.433}, 'LeftArm.rotation':{x:1.136, y:-0.422, z:-0.416}, 'LeftForeArm.rotation':{x:1.42, y:0.123, z:1.506}, 'LeftHand.rotation':{x:0.073, y:-0.138, z:0.064}, 'LeftHandThumb1.rotation':{x:1.467, y:-0.599, z:1.314}, 'LeftHandThumb2.rotation':{x:-0.255, y:0.123, z:-0.119}, 'LeftHandThumb3.rotation':{x:0, y:0.001, z:0}, 'LeftHandIndex1.rotation':{x:-0.293, y:0.066, z:0.112}, 'LeftHandIndex2.rotation':{x:0.181, y:-0.007, z:-0.069}, 'LeftHandIndex3.rotation':{x:0, y:0, z:0}, 'LeftHandMiddle1.rotation':{x:-0.062, y:0.041, z:-0.032}, 'LeftHandMiddle2.rotation':{x:0.149, y:-0.005, z:-0.05}, 'LeftHandMiddle3.rotation':{x:0, y:0, z:0}, 'LeftHandRing1.rotation':{x:0.152, y:0.03, z:-0.132}, 'LeftHandRing2.rotation':{x:0.194, y:-0.007, z:-0.058}, 'LeftHandRing3.rotation':{x:0, y:0, z:0}, 'LeftHandPinky1.rotation':{x:0.306, y:0.015, z:-0.257}, 'LeftHandPinky2.rotation':{x:0.15, y:0.003, z:0.003}, 'LeftHandPinky3.rotation':{x:0, y:0, z:0}
-      },
-      'namaste': {
-        'RightShoulder.rotation':{x:1.758, y:0.099, z:1.604}, 'RightArm.rotation':{x:0.862, y:-0.292, z:-0.932}, 'RightForeArm.rotation':{x:0.083, y:0.066, z:-1.791}, 'RightHand.rotation':{x:-0.52, y:-0.001, z:-0.176}, 'RightHandThumb1.rotation':{x:0.227, y:0.418, z:-0.776}, 'RightHandThumb2.rotation':{x:-0.011, y:-0.003, z:0.171}, 'RightHandThumb3.rotation':{x:-0.041, y:-0.001, z:-0.013}, 'RightHandIndex1.rotation':{x:-0.236, y:0.003, z:-0.028}, 'RightHandIndex2.rotation':{x:0.004, y:0, z:0.001}, 'RightHandIndex3.rotation':{x:0.002, y:0, z:0}, 'RightHandMiddle1.rotation':{x:-0.236, y:0.003, z:-0.028}, 'RightHandMiddle2.rotation':{x:0.004, y:0, z:0.001}, 'RightHandMiddle3.rotation':{x:0.002, y:0, z:0}, 'RightHandRing1.rotation':{x:-0.236, y:0.003, z:-0.028}, 'RightHandRing2.rotation':{x:0.004, y:0, z:0.001}, 'RightHandRing3.rotation':{x:0.002, y:0, z:0}, 'RightHandPinky1.rotation':{x:-0.236, y:0.003, z:-0.028}, 'RightHandPinky2.rotation':{x:0.004, y:0, z:0.001}, 'RightHandPinky3.rotation':{x:0.002, y:0, z:0}, 'LeftShoulder.rotation':{x:1.711, y:-0.002, z:-1.625}, 'LeftArm.rotation':{x:0.683, y:0.334, z:0.977}, 'LeftForeArm.rotation':{x:0.086, y:-0.066, z:1.843}, 'LeftHand.rotation':{x:-0.595, y:-0.229, z:0.096}, 'LeftHandThumb1.rotation':{x:0.404, y:-0.05, z:0.537}, 'LeftHandThumb2.rotation':{x:-0.02, y:0.004, z:-0.154}, 'LeftHandThumb3.rotation':{x:-0.049, y:0.002, z:-0.019}, 'LeftHandIndex1.rotation':{x:-0.113, y:-0.001, z:0.014}, 'LeftHandIndex2.rotation':{x:0.003, y:0, z:0}, 'LeftHandIndex3.rotation':{x:0.002, y:0, z:0}, 'LeftHandMiddle1.rotation':{x:-0.113, y:-0.001, z:0.014}, 'LeftHandMiddle2.rotation':{x:0.004, y:0, z:0}, 'LeftHandMiddle3.rotation':{x:0.002, y:0, z:0}, 'LeftHandRing1.rotation':{x:-0.113, y:-0.001, z:0.014}, 'LeftHandRing2.rotation':{x:0.003, y:0, z:0}, 'LeftHandRing3.rotation':{x:0.002, y:0, z:0}, 'LeftHandPinky1.rotation':{x:-0.122, y:-0.001, z:-0.057}, 'LeftHandPinky2.rotation':{x:0.012, y:0.001, z:0.07}, 'LeftHandPinky3.rotation':{x:0.002, y:0, z:0}
-      }
-    }
-
+    // Convert all the pose templates to THREE objects
+    Object.values(this.poseTemplates).forEach( x => {
+      x.props = this.propsToThreeObjects( x.props );
+    });
 
     // Pose deltas
     // NOTE: In this object (x,y,z) are always Euler rotations despite the name!!
@@ -263,7 +630,7 @@ class TalkingHead {
     // Dynamically pick up all the property names that we need in the code
     const names = new Set();
     Object.values(this.poseTemplates).forEach( x => {
-      Object.keys( this.propsToThreeObjects(x.props) ).forEach( y => names.add(y) );
+      Object.keys(x.props).forEach( y => names.add(y) );
     });
     Object.keys( this.poseDelta.props ).forEach( x => {
       names.add(x)
@@ -273,11 +640,9 @@ class TalkingHead {
     // Use "side" as the first pose, weight on left leg
     this.poseName = "side"; // First pose
     this.poseWeightOnLeft = true; // Initial weight on left leg
-    this.gesture = null; // Values that override pose properties
-    this.poseCurrentTemplate = this.poseTemplates[this.poseName];
-    this.poseBase = this.poseFactory( this.poseCurrentTemplate );
-    this.poseTarget = this.poseFactory( this.poseCurrentTemplate );
-    this.poseStraight = this.propsToThreeObjects( this.poseTemplates["straight"].props ); // Straight pose used as a reference
+    this.poseCurrentTemplate = null;
+    this.poseBase = this.poseFactory( this.poseTemplates[this.poseName] );
+    this.poseTarget = this.poseFactory( this.poseTemplates[this.poseName] );
     this.poseAvatar = null; // Set when avatar has been loaded
 
     // Avatar height in meters
@@ -525,7 +890,12 @@ class TalkingHead {
       '😏': { dt: [300,2000], vs: { browDownRight: [0.1], browInnerUp: [0.7], browOuterUpRight: [0.2], eyeLookInRight: [0.7], eyeLookOutLeft: [0.7], eyeSquintLeft: [1], eyeSquintRight: [0.8], eyesRotateY: [0.7], mouthLeft: [0.4], mouthPucker: [0.4], mouthShrugLower: [0.3], mouthShrugUpper: [0.2], mouthSmile: [0.2], mouthSmileLeft: [0.4], mouthSmileRight: [0.2], mouthStretchLeft: [0.5], mouthUpperUpLeft: [0.6], noseSneerLeft: [0.7] } },
       '🙂': { dt: [300,2000], vs: { mouthSmile: [0.5] } },
       '🙃': { link:  '🙂' },
-      '😊': { dt: [300,1000,1000], vs: { browInnerUp: [0.6], eyeSquintLeft: [1], eyeSquintRight: [1], mouthSmile: [0.7], noseSneerLeft: [0.7], noseSneerRight: [0.7]} },
+      '😊': { dt: [300,1000,1000], vs: {
+        browInnerUp: [0.6], eyeSquintLeft: [1], eyeSquintRight: [1],
+        mouthSmile: [0.7], noseSneerLeft: [0.7], noseSneerRight: [0.7],
+        /* handLeft: [null,{ x: 0.2, y: -0.1, z:0.1, d:1000 }, { d:1000 }],
+        handFistLeft: [0] */
+      } },
       '😇': { link:  '😊' },
       '😀': { dt: [300,2000], vs: { browInnerUp: [0.6], jawOpen: [0.1], mouthDimpleLeft: [0.2], mouthDimpleRight: [0.2], mouthOpen: [0.3], mouthPressLeft: [0.3], mouthPressRight: [0.3], mouthRollLower: [0.4], mouthShrugUpper: [0.4], mouthSmile: [0.7], mouthUpperUpLeft: [0.3], mouthUpperUpRight: [0.3], noseSneerLeft: [0.4], noseSneerRight: [0.4] }},
       '😃': { dt: [300,2000], vs: { browInnerUp: [0.6], eyeWideLeft: [0.7], eyeWideRight: [0.7], jawOpen: [0.1], mouthDimpleLeft: [0.2], mouthDimpleRight: [0.2], mouthOpen: [0.3], mouthPressLeft: [0.3], mouthPressRight: [0.3], mouthRollLower: [0.4], mouthShrugUpper: [0.4], mouthSmile: [0.7], mouthUpperUpLeft: [0.3], mouthUpperUpRight: [0.3], noseSneerLeft: [0.4], noseSneerRight: [0.4] } },
@@ -533,7 +903,7 @@ class TalkingHead {
       '😁': { dt: [300,2000], vs: { browInnerUp: [0.3], eyeSquintLeft: [1], eyeSquintRight: [1], jawOpen: [0.3], mouthDimpleLeft: [0.2], mouthDimpleRight: [0.2], mouthPressLeft: [0.5], mouthPressRight: [0.5], mouthShrugUpper: [0.4], mouthSmile: [0.7], mouthUpperUpLeft: [0.3], mouthUpperUpRight: [0.3], noseSneerLeft: [0.4], noseSneerRight: [0.4] } },
       '😆': { dt: [300,2000], vs: { browInnerUp: [0.3], eyeSquintLeft: [1], eyeSquintRight: [1], eyesClosed: [0.6], jawOpen: [0.3], mouthDimpleLeft: [0.2], mouthDimpleRight: [0.2], mouthPressLeft: [0.5], mouthPressRight: [0.5], mouthShrugUpper: [0.4], mouthSmile: [0.7], mouthUpperUpLeft: [0.3], mouthUpperUpRight: [0.3], noseSneerLeft: [0.4], noseSneerRight: [0.4] } },
       '😝': { dt: [300,100,1500,500,500], vs: { browInnerUp: [0.8], eyesClosed: [1], jawOpen: [0.7], mouthFunnel: [0.5], mouthSmile: [1], tongueOut: [0,1,1,0] } },
-      '😋': { link:  '😝' }, '😛': { link:  '😝' }, '😛': { link:  '😝' }, '😜': { link:  '😝' }, '🤪': { link:  '😝' },
+      '😋': { link:  '😝' }, '😛': { link:  '😝' }, '😜': { link:  '😝' }, '🤪': { link:  '😝' },
       '😂': { dt: [300,2000], vs: { browInnerUp: [0.3], eyeSquintLeft: [1], eyeSquintRight: [1], eyesClosed: [0.6], jawOpen: [0.3], mouthDimpleLeft: [0.2], mouthDimpleRight: [0.2], mouthPressLeft: [0.5], mouthPressRight: [0.5], mouthShrugUpper: [0.4], mouthSmile: [0.7], mouthUpperUpLeft: [0.3], mouthUpperUpRight: [0.3], noseSneerLeft: [0.4], noseSneerRight: [0.4] } },
       '🤣': { link:  '😂' }, '😅': { link:  '😂' },
       '😉': { dt: [500,200,500,500], vs: { mouthSmile: [0.5], mouthOpen: [0.2], mouthSmileLeft: [0,0.5,0], eyeBlinkLeft: [0,0.7,0], eyeBlinkRight: [0,0,0], headRotateX: [0.05,0.05,0.05,0], headRotateZ: [-0.05,-0.05,-0.05,0], browDownLeft: [0,0.7,0], cheekSquintLeft: [0,0.7,0], eyeSquintLeft: [0,1,0], eyesClosed: [0] } },
@@ -568,22 +938,7 @@ class TalkingHead {
       } },
       '👀': { dt: [500,1500], vs: { eyesRotateY: [-0.8] } },
 
-      '😴': { dt: [5000,5000], vs:{ eyeBlinkLeft: [1], eyeBlinkRight: [1], headRotateX: [0.2], headRotateZ: [0.1] } },
-
-      '✋': { dt: [300,2000], vs:{ mouthSmile: [0.5], gesture: [["handup",2,true],null] } },
-      '🤚': { dt: [300,2000], vs:{ mouthSmile: [0.5], gesture: [["handup",2],null] } },
-      '👋': { link:  '✋' },
-      '👍': { dt: [300,2000], vs:{ mouthSmile: [0.5], gesture: [["thumbup",2],null] } },
-      '👎': { dt: [300,2000], vs:{ browDownLeft: [1], browDownRight: [1], eyesLookUp: [0.2], jawForward: [0.3], mouthFrownLeft: [1], mouthFrownRight: [1], headRotateX: [0.15], gesture: [["thumbdown",2],null] } },
-      '👌': { dt: [300,2000], vs:{ mouthSmile: [0.5], gesture: [["ok",2],null] } },
-      '🤷‍♂️': { dt: [1000,1500], vs:{ gesture: [["shrug",2],null] } },
-      '🤷‍♀️': { link: '🤷‍♂️' },
-      '🤷': { link: '🤷‍♂️' },
-      '🙏': { dt: [1500,300,1000], vs:{ eyeBlinkLeft: [0,1], eyeBlinkRight: [0,1], headRotateX: [0], headRotateZ: [0.1], gesture: [["namaste",2],null] } },
-
-      'yes': { dt: [[200,500],[200,500],[200,500],[200,500]], vs:{ headRotateX: [[0.1,0.2],0.1,[0.1,0.2],0], headRotateZ: [[-0.2,0.2]] } },
-      'no': { dt: [[200,500],[200,500],[200,500],[200,500],[200,500]], vs:{ headRotateY: [[-0.1,-0.05],[0.05,0.1],[-0.1,-0.05],[0.05,0.1],0], headRotateZ: [[-0.2,0.2]] } }
-
+      '😴': { dt: [5000,5000], vs:{ eyeBlinkLeft: [1], eyeBlinkRight: [1], headRotateX: [0.2], headRotateZ: [0.1] } }
     };
 
     // Baseline/fixed morph targets
@@ -602,9 +957,10 @@ class TalkingHead {
     this.animTimeLast = 0;
     this.easing = this.sigmoidFactory(5); // Ease in and out
 
-    // Lip-sync extensions, import dynamically
-    this.lipsync = {};
-    this.opt.lipsyncModules.forEach( x => this.lipsyncGetProcessor(x) );
+    // Lip-sync extensions
+    this.lipsync = {
+      'en': new LipsyncEn()
+    };
     this.visemeNames = [
       'aa', 'E', 'I', 'O', 'U', 'PP', 'SS', 'TH', 'DD', 'FF', 'kk',
       'nn', 'RR', 'CH', 'sil'
@@ -677,8 +1033,7 @@ class TalkingHead {
     const pmremGenerator = new THREE.PMREMGenerator( this.renderer );
     pmremGenerator.compileEquirectangularShader();
     this.scene.environment = pmremGenerator.fromScene( new RoomEnvironment() ).texture;
-    this.resizeobserver = new ResizeObserver(this.onResize.bind(this));
-    this.resizeobserver.observe(this.nodeAvatar);
+    new ResizeObserver(this.onResize.bind(this)).observe(this.nodeAvatar);
 
     this.controls = new OrbitControls( this.camera, this.renderer.domElement );
     this.controls.enableZoom = this.opt.cameraZoomEnable;
@@ -799,19 +1154,14 @@ class TalkingHead {
     for( let [key,val] of Object.entries(p) ) {
       const ids = key.split('.');
       let v;
-      let x = Array.isArray(val.x) ? this.gaussianRandom(...val.x) : val.x;
-      let y = Array.isArray(val.y) ? this.gaussianRandom(...val.y) : val.y;
-      let z = Array.isArray(val.z) ? this.gaussianRandom(...val.z) : val.z;
-
       if ( ids[1] === 'position' || ids[1] === 'scale' ) {
-        v = new THREE.Vector3(x,y,z);
+        v = new THREE.Vector3(val.x,val.y,val.z);
       } else if ( ids[1] === 'rotation' ) {
         key = ids[0] + '.quaternion';
-        v = new THREE.Quaternion().setFromEuler(new THREE.Euler(x,y,z,'XYZ')).normalize();
+        v = new THREE.Quaternion().setFromEuler(new THREE.Euler(val.x,val.y,val.z,'XYZ')).normalize();
       } else if ( ids[1] === 'quaternion' ) {
-        v = new THREE.Quaternion(x,y,z,val.w).normalize();
+        v = new THREE.Quaternion(val.x,val.y,val.z,val.w).normalize();
       }
-
       if (v) {
         r[key] = v;
       }
@@ -888,9 +1238,6 @@ class TalkingHead {
         x.morphTargetDictionary ) {
         this.morphs.push(x);
       }
-
-      // Workaround for #40, hands culled from the rendering process
-      x.frustumCulled = false;
     });
     if ( this.morphs.length === 0 ) {
       throw new Error('Blend shapes not found');
@@ -941,7 +1288,7 @@ class TalkingHead {
 
     // Set pose, view and start animation
     if ( !this.viewName ) this.setView( this.opt.cameraView );
-    this.setMood( this.avatar.avatarMood || this.moodName || this.opt.avatarMood );
+    this.setMood( this.moodName || this.avatar.avatarMood || this.opt.avatarMood );
     this.start();
 
   }
@@ -951,7 +1298,7 @@ class TalkingHead {
   * @return {string[]} Supported view names.
   */
   getViewNames() {
-    return ['full', 'mid', 'upper', 'head'];
+    return ['full','upper', 'head'];
   }
 
   /**
@@ -1130,7 +1477,7 @@ class TalkingHead {
   /**
   * Get given pose as a string.
   * @param {Object} pose Pose
-  * @param {number} [prec=1000] Precision used in values
+  * @param {number} [prec=0.001] Precision used in values
   * @return {string} Pose as a string
   */
   getPoseString(pose,prec=1000){
@@ -1153,55 +1500,32 @@ class TalkingHead {
 
 
   /**
-  * Return pose template property taking into account mirror pose and gesture.
+  * Return pose template property taking into account mirror pose.
   * @param {string} key Property key
   * @return {Quaternion|Vector3} Position or rotation
   */
   getPoseTemplateProp(key) {
-
-    const ids = key.split('.');
-    let target = ids[0] + '.' + (ids[1] === 'rotation' ? 'quaternion' : ids[1]);
-
-    if ( this.gesture && this.gesture.hasOwnProperty(target) ) {
-      return this.gesture[target].clone();
-    } else {
-      let source = ids[0] + '.' + (ids[1] === 'quaternion' ? 'rotation' : ids[1]);
-      if ( !this.poseWeightOnLeft ) {
-        if ( source.startsWith('Left') ) {
-          source = 'Right' + source.substring(4);
-          target = 'Right' + target.substring(4);
-        } else if ( source.startsWith('Right') ) {
-          source = 'Left' + source.substring(5);
-          target = 'Left' + target.substring(5);
-        }
+    let q;
+    if ( !this.poseWeightOnLeft ) {
+      if ( key.startsWith('Left') ) {
+        key = 'Right' + key.substring(4);
+      } else if ( key.startsWith('Right') ) {
+        key = 'Left' + key.substring(5);
       }
-
-      // Get value
-      let q;
-      if ( this.poseTarget.template.props.hasOwnProperty(target) ) {
-        const o = {};
-        o[target] = this.poseTarget.template.props[target];
-        q = this.propsToThreeObjects( o )[target];
-      } else if ( this.poseTarget.template.props.hasOwnProperty(source) ) {
-        const o = {};
-        o[source] = this.poseTarget.template.props[source];
-        q = this.propsToThreeObjects( o )[target];
-      }
-
-      // Mirror
-      if ( q && !this.poseWeightOnLeft && q.isQuaternion ) {
+      q = this.poseTarget.template.props[key].clone();
+      if ( q.isQuaternion ) {
         q.x *= -1;
         q.w *= -1;
       }
-
-      return q;
+    } else {
+      q = this.poseTarget.template.props[key].clone();
     }
+    return q;
   }
 
   /**
   * Change body weight from current leg to another.
   * @param {Object} p Pose properties
-  * @return {Object} Mirrored pose.
   */
   mirrorPose(p) {
     const r = {};
@@ -1224,87 +1548,57 @@ class TalkingHead {
       r[key].t = v.t;
       r[key].d = v.d;
     }
+    this.poseWeightOnLeft = !this.poseWeightOnLeft;
     return r;
   }
 
   /**
   * Create a new pose.
   * @param {Object} template Pose template
-  * @param {numeric} [ms=2000] Transition duration in ms
+  * @param {numeric} duration Default duration in ms
   * @return {Object} A new pose object.
   */
-  poseFactory(template, ms=2000) {
-
-    // Pose object
-    const o = {
-      template: template,
-      props: this.propsToThreeObjects( template.props )
-    };
-
-    for( const [p,v] of Object.entries(o.props) ) {
-
-      // Restrain movement when standing
-      if ( this.opt.modelMovementFactor < 1 && template.standing &&
-        (p === 'Hips.quaternion' || p === 'Spine.quaternion' ||
-        p === 'Spine1.quaternion' || p === 'Spine2.quaternion' ||
-        p === 'Neck.quaternion' || p === 'LeftUpLeg.quaternion' ||
-        p === 'LeftLeg.quaternion' || p === 'RightUpLeg.quaternion' ||
-        p === 'RightLeg.quaternion') ) {
-        const ref = this.poseStraight[p];
-        const angle = v.angleTo( ref );
-        v.rotateTowards( ref, (1 - this.opt.modelMovementFactor) * angle );
-      }
+  poseFactory(template, duration) {
+    const o = { template: template, props: {} };
+    Object.entries(template.props).forEach( x => {
+      o.props[x[0]] = x[1].clone();
 
       // Custom properties
-      v.t = this.animClock; // timestamp
-      v.d = ms; // Transition duration
-
-    }
+      o.props[x[0]].t = this.animClock; // timestamp
+      o.props[x[0]].d = duration; // Transition duration
+    });
+    this.poseWeightOnLeft = true;
     return o;
   }
 
   /**
   * Set a new pose and start transition timer.
-  * @param {Object} template Pose template, if null update current pose
-  * @param {number} [ms=2000] Transition time in milliseconds
+  * @param {Object} t Pose template
   */
-  setPoseFromTemplate(template, ms=2000) {
+  setPoseFromTemplate(template) {
 
     // Special cases
-    const isIntermediate = template && this.poseTarget && this.poseTarget.template && ((this.poseTarget.template.standing && template.lying) || (this.poseTarget.template.lying && template.standing));
-    const isSameTemplate = template && (template === this.poseCurrentTemplate);
+    const isIntermediate = this.poseTarget && this.poseTarget.template && ((this.poseTarget.template.standing && template.lying) || (this.poseTarget.template.lying && template.standing));
+    const isSameTemplate = template === this.poseCurrentTemplate;
     const isWeightOnLeft = this.poseWeightOnLeft;
-    let duration = isIntermediate ? 1000 : ms;
+    let duration = isIntermediate ? 1000 : 2000;
 
     // New pose template
     if ( isIntermediate) {
       this.poseCurrentTemplate = this.poseTemplates['oneknee'];
       setTimeout( () => {
-        this.setPoseFromTemplate(template,ms);
+        this.setPoseFromTemplate(template);
       }, duration);
     } else {
-      this.poseCurrentTemplate = template || this.poseCurrentTemplate;
+      this.poseCurrentTemplate = template;
     }
 
     // Set target
     this.poseTarget = this.poseFactory(this.poseCurrentTemplate, duration);
-    this.poseWeightOnLeft = true;
 
     // Mirror properties, if necessary
     if ( (!isSameTemplate && !isWeightOnLeft) || (isSameTemplate && isWeightOnLeft ) ) {
       this.poseTarget.props = this.mirrorPose(this.poseTarget.props);
-      this.poseWeightOnLeft = !this.poseWeightOnLeft;
-    }
-
-    // Gestures
-    if ( this.gesture ) {
-      for( let [p,v] of Object.entries(this.gesture) ) {
-        if ( this.poseTarget.props.hasOwnProperty(p) ) {
-          this.poseTarget.props[p].copy(v);
-          this.poseTarget.props[p].t = v.t;
-          this.poseTarget.props[p].d = v.d;
-        }
-      }
     }
 
     // Make sure deltas are included in the target
@@ -1617,10 +1911,10 @@ class TalkingHead {
     }
 
     // Time series
-    const delay = a.delay ? (Array.isArray(a.delay) ? this.gaussianRandom(...a.delay) : a.delay ) : 0;
+    const delay = a.delay ? (Array.isArray(a.delay) ? this.gaussianRandom(a.delay[0], a.delay[1], a.delay[2], a.delay[3]) : a.delay ) : 0;
     if ( a.hasOwnProperty('dt') ) {
       a.dt.forEach( (x,i) => {
-        o.ts[i+1] = o.ts[i] + (Array.isArray(x) ? this.gaussianRandom(...x) : x);
+        o.ts[i+1] = o.ts[i] + (Array.isArray(x) ? this.gaussianRandom(x[0],x[1],x[2],x[3]) : x);
       });
     }
     o.ts = o.ts.map( x => this.animClock + delay + x * scaleTime );
@@ -1636,11 +1930,7 @@ class TalkingHead {
         } else if ( typeof x === 'string' || x instanceof String ) {
           return x.slice();
         } else if ( Array.isArray(x) ) {
-          if ( mt === 'gesture' ) {
-            return x.slice();
-          } else {
-            return (base === undefined ? 0 : base) + scaleValue * this.gaussianRandom(...x);
-          }
+          return (base === undefined ? 0 : base) + scaleValue * this.gaussianRandom(x[0],x[1],x[2],x[3]);
         } else if ( x instanceof Object && x.constructor === Object ) {
           return Object.assign( {}, x );
         } else {
@@ -1770,15 +2060,13 @@ class TalkingHead {
     const o = {};
     for( let [mt,x] of Object.entries(this.animBaseline) ) {
       const v = this.getValue(mt);
-      const restrain = ( this.isSpeaking && mt.startsWith("mouth") ) ? 3 : 1;
-      const target = x.target / restrain;
-      if ( v !== target ) {
+      if ( v !== x.target ) {
         if ( x.t0 === undefined ) {
           x.t0 = this.animClock;
           x.v0 = v;
         }
         let delay = 1000;
-        o[mt] = this.valueAnimationSeq( [x.t0,x.t0+delay], [x.v0,target], this.animClock, this.easing );
+        o[mt] = this.valueAnimationSeq( [x.t0,x.t0+delay], [x.v0,x.target], this.animClock, this.easing );
       } else {
         x.t0 = undefined;
       }
@@ -1805,13 +2093,6 @@ class TalkingHead {
           } else if ( mt === 'pose' ) {
             o[mt] = ""+vs[1];
             delete x.vs[mt];
-          } else if ( mt === 'gesture' ) {
-            for( let j=0; j<x.ts.length; j++ ) {
-              if ( vs[j] && this.animClock >= x.ts[j] ) {
-                o[mt] = vs[j];
-                vs[j] = null;
-              }
-            }
           } else if ( mt === 'moveto' || mt ==='handLeft' || mt === 'handRight' ) {
             for( let j=0; j<x.ts.length; j++ ) {
               if ( vs[j] && this.animClock >= x.ts[j] ) {
@@ -1868,9 +2149,7 @@ class TalkingHead {
       } else if ( mt === 'pose' ) {
         this.poseName = ""+x;
         this.setPoseFromTemplate( this.poseTemplates[ this.poseName ] );
-      } else if ( mt === 'gesture' ) {
-        this.playGesture( ...x );
-      }else if ( mt === 'moveto' ) {
+      } else if ( mt === 'moveto' ) {
         Object.entries(x.props).forEach( e => {
           if ( e[1] ) {
             this.poseTarget.props[e[0]].copy( e[1] );
@@ -1974,21 +2253,6 @@ class TalkingHead {
   }
 
   /**
-  * Get lip-sync processor based on language. Import module dynamically.
-  * @param {string} lang Language
-  * @return {Object} Pre-processsed text.
-  */
-  lipsyncGetProcessor(lang, path="./") {
-    if ( !this.lipsync.hasOwnProperty(lang) ) {
-      const moduleName = path + 'lipsync-' + lang.toLowerCase() + '.mjs';
-      const className = 'Lipsync' + lang.charAt(0).toUpperCase() + lang.slice(1);
-      import(moduleName).then( module => {
-        this.lipsync[lang] = new module[className];
-      });
-    }
-  }
-
-  /**
   * Preprocess text for tts/lipsync, including:
   * - convert symbols/numbers to words
   * - filter out characters that should be left unspoken
@@ -2026,7 +2290,7 @@ class TalkingHead {
     // Classifiers
     const dividersSentence = /[!\.\?\n\p{Extended_Pictographic}]/ug;
     const dividersWord = /[ ]/ug;
-    const speakables = /[\p{L}\p{N},\.'!€\$\+\p{Dash_Punctuation}%&\?]/ug;
+    const speakables = /[\p{L}\p{N},\.'!€\$\+\-%&\?]/ug;
     const emojis = /[\p{Extended_Pictographic}]/ug;
     const lipsyncLang = opt.lipsyncLang || this.avatar.lipsyncLang || this.opt.lipsyncLang;
 
@@ -2427,7 +2691,7 @@ class TalkingHead {
     if ( !this.armature || (this.isSpeaking && !force) ) return;
     this.stateName = 'talking';
     this.isSpeaking = true;
-    if ( this.speechQueue.length ) {
+    if ( this.speechQueue.length > 0 ) {
       let line = this.speechQueue.shift();
       if ( line.emoji ) {
 
@@ -2461,114 +2725,8 @@ class TalkingHead {
 
         // Spoken text
         try {
-          // Convert text to SSML
-          let ssml = "<speak>";
-          line.text.forEach( (x,i) => {
-            // Add mark
-            if (i > 0) {
-              ssml += " <mark name='" + x.mark + "'/>";
-            }
+          this.startSpeaking(true);
 
-            // Add word
-            ssml += x.word.replaceAll('&','&amp;')
-              .replaceAll('<','&lt;')
-              .replaceAll('>','&gt;')
-              .replaceAll('"','&quot;')
-              .replaceAll('\'','&apos;')
-              .replace(/^\p{Dash_Punctuation}$/ug,'<break time="750ms"/>');
-
-          });
-          ssml += "</speak>";
-
-
-          const o = {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json; charset=utf-8"
-            },
-            body: JSON.stringify({
-              "input": {
-                "ssml": ssml
-              },
-              "voice": {
-                "languageCode": line.lang || this.avatar.ttsLang || this.opt.ttsLang,
-                "name": line.voice || this.avatar.ttsVoice || this.opt.ttsVoice
-              },
-              "audioConfig": {
-                "audioEncoding": this.ttsAudioEncoding,
-                "speakingRate": (line.rate || this.avatar.ttsRate || this.opt.ttsRate) + this.mood.speech.deltaRate,
-                "pitch": (line.pitch || this.avatar.ttsPitch || this.opt.ttsPitch) + this.mood.speech.deltaPitch,
-                "volumeGainDb": (line.volume || this.avatar.ttsVolume || this.opt.ttsVolume) + this.mood.speech.deltaVolume
-              },
-              "enableTimePointing": [ 1 ] // Timepoint information for mark tags
-            })
-          };
-
-          // JSON Web Token
-          if ( this.opt.jwtGet && typeof this.opt.jwtGet === "function" ) {
-            o.headers["Authorization"] = "Bearer " + await this.opt.jwtGet();
-          }
-
-          const res = await fetch( this.opt.ttsEndpoint + (this.opt.ttsApikey ? "?key=" + this.opt.ttsApikey : ''), o);
-          const data = await res.json();
-
-          if ( res.status === 200 && data && data.audioContent ) {
-
-            // Audio data
-            const buf = this.b64ToArrayBuffer(data.audioContent);
-            const audio = await this.audioCtx.decodeAudioData( buf );
-            this.speakWithHands();
-
-            // Workaround for Google TTS not providing all timepoints
-            const times = [ 0 ];
-            let markIndex = 0;
-            line.text.forEach( (x,i) => {
-              if ( i > 0 ) {
-                let ms = times[ times.length - 1 ];
-                if ( data.timepoints[markIndex] ) {
-                  ms = data.timepoints[markIndex].timeSeconds * 1000;
-                  if ( data.timepoints[markIndex].markName === ""+x.mark ) {
-                    markIndex++;
-                  }
-                }
-                times.push( ms );
-              }
-            });
-
-            // Word-to-audio alignment
-            const timepoints = [ { mark: 0, time: 0 } ];
-            times.forEach( (x,i) => {
-              if ( i>0 ) {
-                let prevDuration = x - times[i-1];
-                if ( prevDuration > 150 ) prevDuration - 150; // Trim out leading space
-                timepoints[i-1].duration = prevDuration;
-                timepoints.push( { mark: i, time: x });
-              }
-            });
-            let d = 1000 * audio.duration; // Duration in ms
-            if ( d > this.opt.ttsTrimEnd ) d = d - this.opt.ttsTrimEnd; // Trim out silence at the end
-            timepoints[timepoints.length-1].duration = d - timepoints[timepoints.length-1].time;
-
-            // Re-set animation starting times and rescale durations
-            line.anim.forEach( x => {
-              const timepoint = timepoints[x.mark];
-              if ( timepoint ) {
-                for(let i=0; i<x.ts.length; i++) {
-                  x.ts[i] = timepoint.time + (x.ts[i] * timepoint.duration) + this.opt.ttsTrimStart;
-                }
-              }
-            });
-
-            // Add to the playlist
-            this.audioPlaylist.push({ anim: line.anim, audio: audio });
-            this.onSubtitles = line.onSubtitles || null;
-            this.resetLips();
-            if ( line.mood ) this.setMood( line.mood );
-            this.playAudio();
-
-          } else {
-            this.startSpeaking(true);
-          }
         } catch (error) {
           console.error("Error:", error);
           this.startSpeaking(true);
@@ -2619,9 +2777,15 @@ class TalkingHead {
   * Stop speaking and clear the speech queue.
   */
   stopSpeaking() {
-    try { this.audioSpeechSource.stop(); } catch(error) {}
-    this.audioPlaylist.length = 0;
-    this.speechQueue.length = 0;
+    try {
+      console.log("stopping audioSpeechSource");
+      this.audioSpeechSource.stop();
+    } catch(error) {
+      console.error("error when trying to stop speaking:", error);
+    }
+    this.stop();
+    this.audioPlaylist = [];
+    this.speechQueue = [];
     this.animQueue = this.animQueue.filter( x  => x.template.name !== 'viseme' );
     this.stateName = 'idle';
     this.isSpeaking = false;
@@ -2782,7 +2946,7 @@ class TalkingHead {
   speakWithHands(delay=0,prob=0.5) {
 
     // Only if we are standing and not bending and probabilities match up
-    if ( this.mixer || this.gesture || !this.poseTarget.template.standing || this.poseTarget.template.bend || Math.random()>prob ) return;
+    if ( this.mixer || !this.poseTarget.template.standing || this.poseTarget.template.bend || Math.random()>prob ) return;
 
     // Random targets for left hand
     this.ikSolve( {
@@ -2824,7 +2988,7 @@ class TalkingHead {
     } } );
     ["LeftArm","LeftForeArm","RightArm","RightForeArm"].forEach( x => {
       moveto[0].props[x+'.quaternion'] = this.ikMesh.getObjectByName(x).quaternion.clone();
-    });
+    })
 
     // Return to original target
     dt.push( 1000 + Math.round( Math.random() * 500 ) );
@@ -2901,7 +3065,7 @@ class TalkingHead {
 
   /**
   * Play RPM/Mixamo animation clip.
-  * @param {string|Object} url URL to animation file FBX
+  * @param {string} url URL to animation file FBX
   * @param {progressfn} [onprogress=null] Callback for progress
   * @param {number} [dur=10] Duration in seconds, but at least once
   * @param {number} [ndx=0] Index of the clip
@@ -2995,36 +3159,18 @@ class TalkingHead {
   * Stop running animations.
   */
   stopAnimation() {
-
-    // Stop mixer
     this.mixer = null;
-
-    // Restart gesture
-    if ( this.gesture ) {
-      for( let [p,v] of Object.entries(this.gesture) ) {
-        v.t = this.animClock;
-        v.d = 1000;
-        if ( this.poseTarget.props.hasOwnProperty(p) ) {
-          this.poseTarget.props[p].copy(v);
-          this.poseTarget.props[p].t = this.animClock;
-          this.poseTarget.props[p].d = 1000;
-        }
-      }
-    }
-
-    // Restart pose animation
+    this.poseCurrentTemplate = null; // This forces the pose change
     let anim = this.animQueue.find( x => x.template.name === 'pose' );
     if ( anim ) {
       anim.ts[0] = this.animClock;
     }
-    this.setPoseFromTemplate( null );
-
   }
 
 
   /**
   * Play RPM/Mixamo pose.
-  * @param {string|Object} url Pose name | URL to FBX
+  * @param {string} url URL to animation file FBX
   * @param {progressfn} [onprogress=null] Callback for progress
   * @param {number} [dur=5] Duration of the pose in seconds
   * @param {number} [ndx=0] Index of the clip
@@ -3113,126 +3259,6 @@ class TalkingHead {
   }
 
   /**
-  * Play a gesture, which is either a hand gesture, an emoji animation or their
-  * combination.
-  * @param {string} name Gesture name
-  * @param {number} [dur=3] Duration of the gesture in seconds
-  * @param {boolean} [mirror=false] Mirror gesture
-  * @param {number} [ms=1000] Transition time in milliseconds
-  */
-  playGesture(name, dur=3, mirror=false, ms=1000) {
-
-    if ( !this.armature ) return;
-
-    // Hand gesture, if any
-    let g = this.gestureTemplates[name];
-    if ( g ) {
-
-      // New gesture always overrides the existing one
-      if ( this.gestureTimeout ) {
-        clearTimeout( this.gestureTimeout );
-        this.gestureTimeout = null;
-      }
-
-      // Stop talking hands animation
-      let ndx = this.animQueue.findIndex( y => y.template.name === "talkinghands" );
-      if ( ndx !== -1 ) {
-        this.animQueue[ndx].ts = this.animQueue[ndx].ts.map( x => 0 );
-      }
-
-      // Set gesture
-      this.gesture = this.propsToThreeObjects( g );
-      if ( mirror ) {
-        this.gesture = this.mirrorPose( this.gesture );
-      }
-      if ( name === "namaste" && this.avatar.body === 'M' ) {
-        // Work-a-round for male model so that the hands meet
-        this.gesture["RightArm.quaternion"].rotateTowards( new THREE.Quaternion(0,1,0,0), -0.25);
-        this.gesture["LeftArm.quaternion"].rotateTowards( new THREE.Quaternion(0,1,0,0), -0.25);
-      }
-
-      // Apply to target
-      for( let [p,v] of Object.entries(this.gesture) ) {
-        v.t = this.animClock;
-        v.d = ms;
-        if ( this.poseTarget.props.hasOwnProperty(p) ) {
-          this.poseTarget.props[p].copy(v);
-          this.poseTarget.props[p].t = this.animClock;
-          this.poseTarget.props[p].d = ms;
-        }
-      }
-
-      // Timer
-      if ( dur && Number.isFinite(dur) ) {
-        this.gestureTimeout = setTimeout( this.stopGesture.bind(this,ms), 1000 * dur);
-      }
-    }
-
-    // Animated emoji, if any
-    let e = this.animEmojis[name];
-    if ( e ) {
-
-      // Follow link
-      if ( e && e.link ) {
-        e = this.animEmojis[e.link];
-      }
-
-      if ( e ) {
-        // Look at the camera for 500 ms
-        this.lookAtCamera(500);
-
-        // Create animation and tag as gesture
-        const anim = this.animFactory( e );
-        anim.gesture = true;
-
-        // Rescale duration
-        if ( dur && Number.isFinite(dur) ) {
-          const first = anim.ts[0];
-          const last = anim.ts[ anim.ts.length -1 ];
-          const scale = (1000 * dur) / (last-first);
-          anim.ts = anim.ts.map( x => first + scale * (x - first) );
-        }
-
-        this.animQueue.push( anim );
-      }
-    }
-
-  }
-
-  /**
-  * Stop the gesture.
-  * @param {number} [ms=1000] Transition time in milliseconds
-  */
-  stopGesture(ms=1000) {
-
-    // Stop gesture timer
-    if ( this.gestureTimeout ) {
-      clearTimeout( this.gestureTimeout );
-      this.gestureTimeout = null;
-    }
-
-    // Stop hand gesture, if any
-    if ( this.gesture ) {
-      const gs = Object.entries(this.gesture);
-      this.gesture = null;
-      for( const [p,v] of gs ) {
-        if ( this.poseTarget.props.hasOwnProperty(p) ) {
-          this.poseTarget.props[p].copy( this.getPoseTemplateProp(p) );
-          this.poseTarget.props[p].t = this.animClock;
-          this.poseTarget.props[p].d = ms;
-        }
-      }
-    }
-
-    // Stop animated emoji gesture, if any
-    let i = this.animQueue.findIndex( y => y.gesture );
-    if ( i !== -1 ) {
-      this.animQueue.splice(i, 1);
-    }
-
-  }
-
-  /**
   * Cyclic Coordinate Descent (CCD) Inverse Kinematic (IK) algorithm.
   * Adapted from:
   * https://github.com/mrdoob/three.js/blob/master/examples/jsm/animation/CCDIKSolver.js
@@ -3272,7 +3298,7 @@ class TalkingHead {
     if ( target ) {
       for ( let i = 0; i < iterations; i ++ ) {
         let rotated = false;
-        for ( let j = 0, jl = links.length; j < jl; j++ ) {
+        for ( let j = 0, jl = links.length; j < jl; j ++ ) {
           const bone = links[j].bone;
           bone.matrixWorld.decompose( linkPos, invLinkQ, linkScale );
           invLinkQ.invert();

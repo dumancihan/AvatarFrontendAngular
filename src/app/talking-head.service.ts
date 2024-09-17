@@ -1,5 +1,6 @@
 // talking-head.service.ts
 import { Injectable } from '@angular/core';
+import { TalkingHead } from '../assets/js/talkinghead.mjs';
 
 @Injectable({
   providedIn: 'root'
@@ -10,11 +11,9 @@ export class TalkingHeadService {
   constructor() {}
   
   initializeTalkingHead(element: HTMLElement): void {
-    const {TalkingHead} = require('../assets/js/talkinghead.mjs'); // Importiere die lokale JS-Datei
     this.head = new TalkingHead(element, {
-      ttsEndpoint: "/gtts/",
-      jwtGet: () => fetch('app/jwt/get').then(response => response.json()).then(data => data.jwt),
-      lipsyncModules: ["en"]
+      ttsEndpoint: "none",
+      cameraView: "mid"
     });
   }
 

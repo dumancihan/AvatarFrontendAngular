@@ -1,22 +1,30 @@
 {
   "compileOnSave": false,
   "compilerOptions": {
+    "allowJs": true,
     "outDir": "./dist/out-tsc",
-    "forceConsistentCasingInFileNames": true,
     "strict": false,
+    "noImplicitOverride": false,
+    "noPropertyAccessFromIndexSignature": false,
+    "noImplicitReturns": false,
+    "noFallthroughCasesInSwitch": false,
+    "skipLibCheck": false,
+    "esModuleInterop": true,
+    "sourceMap": true,
+    "declaration": false,
+    "experimentalDecorators": true,
+    "strictNullChecks": false,
     "moduleResolution": "node",
     "importHelpers": true,
     "target": "ES2022",
     "module": "ES2022",
     "useDefineForClassFields": false,
-    "strictNullChecks": false,
     "lib": [
       "ES2022",
       "dom"
     ],
     "baseUrl": "./",
     "paths": {
-      "talkinghead": ["src/assets/js/talkinghead.mjs"]  // Füge hier den Pfad zum Modul hinzu
     }
   },
   "angularCompilerOptions": {
@@ -27,6 +35,5 @@
     "src/**/*.ts"
   ],
   "exclude": [
-    "assets/js/talkinghead.mjs"
   ]
 }
